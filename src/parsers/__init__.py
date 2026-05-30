@@ -1,5 +1,6 @@
 from .gpay  import GPayParser
 from .paytm import PaytmParser
+from .bhim  import BHIMParser
 from .base  import BaseParser, Transaction
 
 # -----------------------------------------------------------------------
@@ -12,6 +13,14 @@ from .base  import BaseParser, Transaction
 PROVIDER_REGISTRY: dict[str, type[BaseParser]] = {
     "gpay":  GPayParser,
     "paytm": PaytmParser,
+    "bhim":  BHIMParser,
+}
+
+# File extensions each provider accepts
+PROVIDER_EXTENSIONS: dict[str, list[str]] = {
+    "gpay":  [".pdf"],
+    "paytm": [".pdf"],
+    "bhim":  [".html", ".htm"],
 }
 
 
@@ -25,3 +34,7 @@ def get_parser(provider: str) -> BaseParser:
 
 def supported_providers() -> list[str]:
     return list(PROVIDER_REGISTRY.keys())
+
+
+def valid_extensions_for(provider: str) -> list[str]:
+    return PROVIDER_EXTENSIONS.get(provider.strip().lower(), [".pdf"])
