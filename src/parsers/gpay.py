@@ -14,8 +14,8 @@ class GPayParser(BaseParser):
     """
     Parses Google Pay transaction statement PDFs.
 
-    PDF quirk: pdfplumber strips all spaces, so text like
-    "Paid to EatClub" becomes "PaidtoEatClub". Regexes account for this.
+    PDF quirk: pdfplumber strips all spaces, so "Paid to EatClub"
+    becomes "PaidtoEatClub". Regexes account for this.
 
     Line structure per transaction (3 lines):
       Line 1: "01Nov,2025 PaidtoEatClub ₹220"
@@ -36,15 +36,13 @@ class GPayParser(BaseParser):
     def _parse_amount(self, s: str) -> float:
         return float(s.replace("₹", "").replace(",", ""))
 
-    def _parse_page(self, text: str) -> list[Transaction]:
+    def _parse_page(self, text: str) -> list:
         results = []
         lines = [l.strip() for l in text.split('\n') if l.strip()]
 
         i = 0
         while i < len(lines):
             line = lines[i]
-
-            # "01Nov,2025 PaidtoEatClub ₹220"
             m = re.match(
                 r'^(\d{2}\w+,\d{4})\s+((?:Paid|Received)\S+?)\s+(₹[\d,]+(?:\.\d+)?)$',
                 line
@@ -53,7 +51,6 @@ class GPayParser(BaseParser):
                 date_str, raw_action, amount_str = m.groups()
                 time_str = upi_id = bank = bank_dir = ""
 
-                # Line 2: time + UPI ID
                 if i + 1 < len(lines):
                     tm = re.match(
                         r'^(\d{1,2}:\d{2}[AP]M)\s+UPITransactionID:(\d+)$',
@@ -63,7 +60,6 @@ class GPayParser(BaseParser):
                         time_str, upi_id = tm.groups()
                         i += 1
 
-                # Line 3: bank direction
                 if i + 1 < len(lines):
                     bm = re.match(r'^(Paidby|Paidto)(.+)$', lines[i + 1])
                     if bm:
@@ -104,9 +100,9 @@ class GPayParser(BaseParser):
             i += 1
         return results
 
-    def extract_from_pdf(self, pdf_path: str) -> list[Transaction]:
+    def extract_from_pdf(self, file_path: str) -> list:
         all_txns = []
-        with pdfplumber.open(pdf_path) as pdf:
+        with pdfplumber.open(file_path) as pdf:
             total = len(pdf.pages)
             for idx, page in enumerate(pdf.pages, 1):
                 text = page.extract_text()
@@ -114,4 +110,4 @@ class GPayParser(BaseParser):
                     all_txns.extend(self._parse_page(text))
                 print(f"  [GPay] Page {idx}/{total} — {len(all_txns)} transactions", end="\r")
         print()
-        return all_txns
+        return self.deduplicate(all_txns)

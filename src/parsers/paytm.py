@@ -14,19 +14,18 @@ class PaytmParser(BaseParser):
     """
     Parses Paytm UPI transaction statement PDFs.
 
-    PDF quirk: unlike GPay, spaces ARE preserved. Each transaction spans
-    multiple lines. The date and action are on the SAME line, time on the next.
+    Spaces ARE preserved (unlike GPay). Each transaction spans multiple lines.
+    Date and action are on the SAME line, time on the next.
 
-    Line structure per transaction:
+    Line structure:
       Line 1: "25 May Paid to Zepto           Tag: State Bank  - Rs.189"
       Line 2: "9:06 PM"
       Line 3: "UPI ID: zeptoonline@ybl on     # Groceries  Of India - 34"
       Line 4: "UPI Ref No: 206961293214"
 
-    Dates have NO year — year is inferred from the statement period header.
+    Dates have NO year — inferred from the statement period header.
     """
 
-    # Matches the main transaction line
     TXN_LINE = re.compile(
         r'^(\d{1,2})\s+'
         r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+'
@@ -40,10 +39,6 @@ class PaytmParser(BaseParser):
     UPI_REF_LINE = re.compile(r'^UPI Ref No:\s*(\d+)')
 
     def _extract_date_range(self, full_text: str):
-        """
-        Extracts start and end date from header like "27 MAY'25 - 26 MAY'26".
-        Used to resolve the year for each transaction date.
-        """
         m = re.search(
             r"(\d+)\s+(\w+)'(\d{2})\s*-\s*(\d+)\s+(\w+)'(\d{2})",
             full_text
@@ -66,9 +61,8 @@ class PaytmParser(BaseParser):
 
     def _resolve_year(self, day: str, month_str: str, start_date, end_date):
         """
-        Paytm dates have no year. Try both boundary years and return
-        the one that falls inside the statement date range.
-        Fallback to end_year if neither fits cleanly.
+        Try both boundary years and return the one that falls inside
+        the statement date range. Fallback to end_year.
         """
         mon = int(MONTH_MAP[month_str[:3].capitalize()])
         day = int(day)
@@ -79,20 +73,18 @@ class PaytmParser(BaseParser):
                     return d
             except ValueError:
                 continue
-        # Fallback
         try:
             return datetime(end_date.year, mon, day).date()
         except ValueError:
             return None
 
     def _parse_amount(self, s: str) -> float:
-        """'- Rs.2,787.50' → 2787.50,  '+ Rs.1,500' → 1500.0"""
         m = re.search(r'Rs\.([\d,]+(?:\.\d+)?)', s)
         if m:
             return float(m.group(1).replace(',', ''))
         return 0.0
 
-    def _parse_transactions(self, full_text: str, start_date, end_date) -> list[Transaction]:
+    def _parse_transactions(self, full_text: str, start_date, end_date) -> list:
         results = []
         lines = full_text.split('\n')
 
@@ -109,31 +101,24 @@ class PaytmParser(BaseParser):
                 txn_time = None
                 upi_id = upi_ref = tag = note = ""
 
-                # Scan ahead up to 10 lines for time, UPI ID, ref, tag, note
                 j = i + 1
                 while j < min(i + 10, len(lines)):
                     nl = lines[j].strip()
 
                     if self.TIME_LINE.match(nl) and not txn_time:
                         txn_time = datetime.strptime(nl.replace(" ", ""), "%I:%M%p").time()
-
                     elif nl.startswith("UPI ID:") and not upi_id:
                         um = self.UPI_ID_LINE.match(nl)
                         if um:
                             upi_id = um.group(1)
-
                     elif nl.startswith("UPI Ref No:") and not upi_ref:
                         rm = self.UPI_REF_LINE.match(nl)
                         if rm:
                             upi_ref = rm.group(1)
-
                     elif nl.startswith("# ") and not tag:
                         tag = nl[2:].strip()
-
                     elif nl.startswith("Note:") and not note:
                         note = nl[5:].strip()
-
-                    # Stop if next transaction starts
                     elif self.TXN_LINE.match(nl):
                         break
 
@@ -160,16 +145,16 @@ class PaytmParser(BaseParser):
                     note=note or None,
                 ))
 
-                i = j  # jump past the block we just consumed
+                i = j
                 continue
 
             i += 1
 
         return results
 
-    def extract_from_pdf(self, pdf_path: str) -> list[Transaction]:
+    def extract_from_pdf(self, file_path: str) -> list:
         full_text = ""
-        with pdfplumber.open(pdf_path) as pdf:
+        with pdfplumber.open(file_path) as pdf:
             total = len(pdf.pages)
             for idx, page in enumerate(pdf.pages, 1):
                 text = page.extract_text()
@@ -181,4 +166,4 @@ class PaytmParser(BaseParser):
         start_date, end_date = self._extract_date_range(full_text)
         txns = self._parse_transactions(full_text, start_date, end_date)
         print(f"  [Paytm] {len(txns)} transactions extracted")
-        return txns
+        return self.deduplicate(txns)
