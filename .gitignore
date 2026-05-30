@@ -1,0 +1,36 @@
+# Environment variables — NEVER commit these
+docker/.env
+.env
+
+# Postgres data volume — large binary files, no point tracking
+docker/pgdata/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs — machine-generated, not useful in git
+logs/
+
+# Data files — PDFs and HTMLs contain personal financial data
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
