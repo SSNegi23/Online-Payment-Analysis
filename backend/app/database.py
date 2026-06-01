@@ -1,10 +1,12 @@
+from pathlib import Path 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 import os
 from dotenv import load_dotenv
 
 # Load the same .env file your ETL uses — no duplication of config
-load_dotenv(dotenv_path="../../docker/.env")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent 
+load_dotenv(dotenv_path=BASE_DIR/"docker"/".env")
 
 DB_USER     = os.getenv("POSTGRES_USER")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
@@ -14,14 +16,21 @@ DB_PORT     = os.getenv("DB_PORT", "5432")
 
 # asyncpg is the async PostgreSQL driver
 # This is the connection string format SQLAlchemy expects for async postgres
-DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?ssl=disable"
 
+print(f"Connecting to: host={DB_HOST} port={DB_PORT} user={DB_USER} db={DB_NAME}")
 # The engine manages the connection pool — one engine for the whole app
 engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,       # set True to print every SQL query (useful for debugging)
-    pool_size=10,     # max 10 simultaneous DB connections
-    max_overflow=20,  # allow 20 extra if pool is full
+    "postgresql+asyncpg://",   # empty URL — we pass everything via connect_args
+    connect_args={
+        "host":     DB_HOST,
+        "port":     int(DB_PORT),
+        "user":     DB_USER,
+        "password": DB_PASSWORD,
+        "database": DB_NAME,
+        "ssl":      False,
+    },
+    pool_pre_ping=True,
 )
 
 # SessionLocal is a factory — calling it creates a new DB session

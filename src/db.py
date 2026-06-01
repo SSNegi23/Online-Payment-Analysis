@@ -2,8 +2,10 @@ import os
 import psycopg2
 from psycopg2.extras import execute_batch
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv(dotenv_path="../docker/.env")
+BASE_DIR = Path(__file__).resolve().parent.parent  # src/ → project root
+load_dotenv(dotenv_path=BASE_DIR / "docker" / ".env")
 
 DB_CONFIG = {
     "host":     os.getenv("DB_HOST", "localhost"),

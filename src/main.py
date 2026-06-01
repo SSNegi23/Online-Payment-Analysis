@@ -4,18 +4,19 @@ from pathlib import Path
 from parsers import get_parser, supported_providers, valid_extensions_for
 from db import setup_table, insert_transactions
 
-os.makedirs("../logs", exist_ok=True)
+LOGS_DIR = Path(__file__).resolve().parent.parent / "logs"
+os.makedirs(LOGS_DIR, exist_ok=True) 
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)s  %(message)s",
     handlers=[
-        logging.FileHandler("../logs/etl.log"),
+        logging.FileHandler(str(LOGS_DIR / "etl.log")),
         logging.StreamHandler()
     ]
 )
 
-DATA_DIR = Path("../data")
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" 
 SUPPORTED_EXTENSIONS = {".pdf", ".html", ".htm"}
 
 
