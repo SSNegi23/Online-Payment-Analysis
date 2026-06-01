@@ -1,6 +1,7 @@
 # Environment variables — NEVER commit these
 docker/.env
 .env
+*/.env 
 
 # Postgres data volume — large binary files, no point tracking
 docker/pgdata/
